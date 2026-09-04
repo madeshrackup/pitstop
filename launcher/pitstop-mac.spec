@@ -19,8 +19,8 @@ a = Analysis(
     [str(SPECDIR / "gui.py")],
     pathex=[str(SPECDIR)],
     binaries=[],
-    datas=[],
-    hiddenimports=["pitstop"],
+    datas=[(str(SPECDIR / "assets"), "assets")],
+    hiddenimports=["pitstop", "rksys", "rfldb", "wii_chars"],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -65,12 +65,13 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name="Pitstop.app",
-    icon=None,
+    icon=str(SPECDIR / "assets" / "pitstop.icns"),
     bundle_identifier="org.pitstop.launcher",
     info_plist={
         "CFBundleName": "Pitstop",
         "CFBundleDisplayName": "Pitstop",
         "CFBundleShortVersionString": "1.0.0",
+        "CFBundleIconFile": "pitstop",
         "NSHighResolutionCapable": True,
     },
 )

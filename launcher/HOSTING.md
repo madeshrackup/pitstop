@@ -1,6 +1,6 @@
 # Hosting the Pitstop pack (update without reshipping the app)
 
-Friends’ `Pitstop.app` / `.exe` downloads the pack on **Setup / Update**. You only re-upload pack zips when GCT/UI/tools change.
+Friends’ `Pitstop.app` / `.exe` downloads the pack on **first setup** and **Check for updates**. You only re-upload pack zips when GCT/UI/tools change.
 
 ## Manifest
 

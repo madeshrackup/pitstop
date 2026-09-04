@@ -10,8 +10,8 @@
 		</section>
 	</options>
 	<patch id="PitstopMain">
-		<!-- Pitstop-only save: never touches vanilla Dolphin MKWii licenses -->
-		<savegame clone="false" external="/riivolution/save/Pitstop/{$__gameid}{$__region}"/>
+		<!-- Saves: Dolphin -u pitstop-user only (no Riivolution savegame redirect).
+		     Vanilla Dolphin NAND is never opened by Pitstop launches. -->
 		<!-- English UI: replace "Nintendo WFC" with "Pitstop" -->
 		<file disc="/Scene/UI/MenuSingle_U.szs" external="/assets/UI/MenuSingle_U.szs"/>
 		<file disc="/Scene/UI/MenuMulti_U.szs" external="/assets/UI/MenuMulti_U.szs"/>

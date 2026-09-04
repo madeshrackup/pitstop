@@ -17,6 +17,7 @@ import urllib.request
 import zipfile
 from pathlib import Path
 from typing import Callable
+from dataclasses import dataclass
 
 APP_NAME = "Pitstop"
 GAME_ID = "RMCE01"
@@ -124,6 +125,10 @@ DEFAULT_CONFIG = {
     "game_path": "",
     # HTTPS URL to manifest.json (GitHub Releases /latest/download/manifest.json)
     "pack_manifest_url": DEFAULT_PACK_MANIFEST_URL,
+    # License slot 0–3 shown under the sidebar logo, or null
+    "primary_license_index": None,
+    # Set True after the first-run wizard finishes successfully
+    "setup_complete": False,
 }
 
 
@@ -175,7 +180,11 @@ def default_pitstop_user() -> str:
 
 
 def ensure_pitstop_user(cfg: dict) -> Path:
-    """Create isolated Dolphin user; copy controller/GFX settings from main Dolphin."""
+    """Create isolated Dolphin user; copy controller/GFX settings from main Dolphin.
+
+    Never copies Wii NAND / saves. Never overwrites Pitstop's Dolphin.ini after first
+    create (that used to re-import vanilla WirelessMac and share Wii identity).
+    """
     main = Path(cfg.get("dolphin_user_path") or default_dolphin_user())
     pit = Path(cfg.get("pitstop_user_path") or default_pitstop_user())
     pit.mkdir(parents=True, exist_ok=True)
@@ -183,12 +192,11 @@ def ensure_pitstop_user(cfg: dict) -> Path:
     (pit / "GameSettings").mkdir(parents=True, exist_ok=True)
     (pit / "Wii").mkdir(parents=True, exist_ok=True)
 
-    # Sync input/graphics so Pitstop feels like their normal Dolphin — not Wii saves.
+    # Input / graphics only — not Dolphin.ini (WirelessMac / NAND paths).
     cfg_names = (
         "GCPadNew.ini",
         "WiimoteNew.ini",
         "GFX.ini",
-        "Dolphin.ini",
         "Hotkeys.ini",
         "Logger.ini",
     )
@@ -200,15 +208,183 @@ def ensure_pitstop_user(cfg: dict) -> Path:
             dst = dst_cfg / name
             if src.exists() and (not dst.exists() or src.stat().st_mtime > dst.stat().st_mtime):
                 shutil.copy2(src, dst)
+
+    _ensure_isolated_dolphin_ini(pit, main)
     return pit
 
 
+def _ini_get(content: str, key: str) -> str | None:
+    for line in content.splitlines():
+        if line.strip().startswith(f"{key}"):
+            parts = line.split("=", 1)
+            if len(parts) == 2 and parts[0].strip() == key:
+                return parts[1].strip()
+    return None
+
+
+def _ini_set(content: str, key: str, value: str) -> str:
+    lines = content.splitlines()
+    out: list[str] = []
+    found = False
+    for line in lines:
+        if line.strip().startswith(f"{key}") and "=" in line and line.split("=", 1)[0].strip() == key:
+            out.append(f"{key} = {value}")
+            found = True
+        else:
+            out.append(line)
+    if not found:
+        # Prefer [General] section
+        inserted = False
+        final: list[str] = []
+        for line in out:
+            final.append(line)
+            if not inserted and line.strip() == "[General]":
+                final.append(f"{key} = {value}")
+                inserted = True
+        if not inserted:
+            final.extend(["[General]", f"{key} = {value}"])
+        return "\n".join(final).rstrip() + "\n"
+    return "\n".join(out).rstrip() + "\n"
+
+
+def _ensure_isolated_dolphin_ini(pit: Path, main: Path) -> None:
+    """Keep a Pitstop-owned Dolphin.ini with its own WirelessMac (not vanilla's)."""
+    dst = pit / "Config" / "Dolphin.ini"
+    src = main / "Config" / "Dolphin.ini"
+    if not dst.exists():
+        if src.exists():
+            shutil.copy2(src, dst)
+        else:
+            dst.write_text("[General]\nNANDRootPath = \nLoadPath = \n", encoding="utf-8")
+
+    text = dst.read_text(encoding="utf-8", errors="replace")
+    main_mac = ""
+    if src.exists():
+        main_mac = _ini_get(src.read_text(encoding="utf-8", errors="replace"), "WirelessMac") or ""
+    pit_mac = _ini_get(text, "WirelessMac") or ""
+
+    # Pin NAND to the Pitstop user Wii folder (never vanilla Application Support/Dolphin).
+    text = _ini_set(text, "NANDRootPath", str((pit / "Wii").resolve()))
+    text = _ini_set(text, "LoadPath", "")
+
+    # Unique Wii wireless MAC so Pitstop is not the same device as vanilla Dolphin.
+    if not pit_mac or (main_mac and pit_mac == main_mac):
+        # Stable Pitstop-local MAC (locally administered bit set via 02:…).
+        text = _ini_set(text, "WirelessMac", "02:50:17:50:00:01")
+
+    dst.write_text(text, encoding="utf-8")
+
+
+def ensure_pitstop_save(cfg: dict) -> Path:
+    """Ensure Pitstop NAND save directory exists under the isolated user only.
+
+    Canonical save: {pitstop_user}/Wii/title/00010004/524d4345/data/rksys.dat
+    Created by the game on first Play. Never reads/writes vanilla Dolphin.
+    """
+    import rksys as rksys_mod
+
+    path = rksys_mod.nand_rksys_path(cfg)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # Remove obsolete Riivolution external save tree (old redirect) so nothing
+    # confuses which file is authoritative.
+    pit = Path(cfg.get("pitstop_user_path") or default_pitstop_user())
+    stale_ext = pit / "Load" / "Riivolution" / APP_NAME / "riivolution" / "save"
+    if stale_ext.is_dir():
+        try:
+            shutil.rmtree(stale_ext)
+        except OSError:
+            pass
+    return path
+
+
+def vanilla_rksys_path(cfg: dict) -> Path | None:
+    """Vanilla Dolphin MKWii save — for isolation checks only. Never write here."""
+    main = cfg.get("dolphin_user_path") or default_dolphin_user()
+    if not main:
+        return None
+    return Path(main) / "Wii" / "title" / "00010004" / "524d4345" / "data" / "rksys.dat"
+
+
+def assert_save_isolation(cfg: dict) -> None:
+    """Hard-fail if Pitstop save resolution would touch vanilla Dolphin."""
+    import rksys as rksys_mod
+
+    pit_save = rksys_mod.nand_rksys_path(cfg)
+    van = vanilla_rksys_path(cfg)
+    if van is not None and pit_save.resolve() == van.resolve():
+        raise RuntimeError(
+            "FATAL: Pitstop save path resolved to vanilla Dolphin rksys.dat — aborting."
+        )
+    print(f"Pitstop save (isolated): {pit_save}")
+    if van is not None:
+        print(f"Vanilla Dolphin save (untouched): {van}")
+        print(f"  vanilla fingerprint: {rksys_mod.file_fingerprint(van)}")
+    if pit_save.is_file():
+        print(f"  pitstop fingerprint: {rksys_mod.file_fingerprint(pit_save)}")
+
+
 def default_dolphin_binary() -> str:
+    found = discover_dolphin_binary()
+    if found is not None:
+        return str(found)
     if platform.system() == "Windows":
         return str(Path.home() / "AppData" / "Local" / "Programs" / "Dolphin" / "Dolphin.exe")
     if platform.system() == "Darwin":
         return "/Applications/Dolphin.app/Contents/MacOS/Dolphin"
     return "/usr/bin/dolphin-emu"
+
+
+def discover_dolphin_binary() -> Path | None:
+    """Return a Dolphin binary if found in common install locations."""
+    candidates: list[Path] = []
+    system = platform.system()
+    if system == "Darwin":
+        for base in (Path("/Applications"), Path.home() / "Applications"):
+            binary = base / "Dolphin.app" / "Contents" / "MacOS" / "Dolphin"
+            candidates.append(binary)
+    elif system == "Windows":
+        local = Path.home() / "AppData" / "Local"
+        pf = Path(os.environ.get("ProgramFiles", r"C:\Program Files"))
+        pf86 = Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"))
+        candidates.extend(
+            [
+                local / "Programs" / "Dolphin" / "Dolphin.exe",
+                pf / "Dolphin" / "Dolphin.exe",
+                pf86 / "Dolphin" / "Dolphin.exe",
+            ]
+        )
+    else:
+        which = shutil.which("dolphin-emu")
+        if which:
+            candidates.append(Path(which))
+    for path in candidates:
+        if path.is_file():
+            return path
+    return None
+
+
+def normalize_dolphin_path(raw: str) -> str:
+    """Resolve Dolphin.app bundles to the inner MacOS binary when needed."""
+    path = Path(raw.strip())
+    if platform.system() == "Darwin" and path.suffix == ".app":
+        inner = path / "Contents" / "MacOS" / "Dolphin"
+        if inner.is_file():
+            return str(inner)
+    return str(path)
+
+
+def dolphin_path_ok(raw: str) -> bool:
+    try:
+        return Path(normalize_dolphin_path(raw)).is_file()
+    except OSError:
+        return False
+
+
+@dataclass(frozen=True)
+class PackSyncResult:
+    path: Path
+    version: str
+    changed: bool
 
 
 def cache_dir() -> Path:
@@ -579,7 +755,7 @@ def fetch_manifest(url: str, progress: ProgressFn | None = None) -> dict:
         raise RuntimeError(f"Invalid pack manifest JSON at {url}") from e
 
 
-def ensure_pack(cfg: dict, progress: ProgressFn | None = None, force: bool = False) -> Path:
+def ensure_pack(cfg: dict, progress: ProgressFn | None = None, force: bool = False) -> PackSyncResult:
     """Download/update pack from hosted manifest into ~/.config/pitstop/pack.
 
     Manifest shape (GitHub Releases friendly):
@@ -596,13 +772,15 @@ def ensure_pack(cfg: dict, progress: ProgressFn | None = None, force: bool = Fal
     # Dev: prefer local repo without network.
     if not url and _repo_dev_pack_ok():
         log("Using local repo pack (dev mode — no manifest URL set).")
-        return Path(__file__).resolve().parent.parent / "patch"
+        root = Path(__file__).resolve().parent.parent / "patch"
+        return PackSyncResult(path=root.parent, version="dev", changed=False)
 
     if not url:
         # Already downloaded once?
         if (pack_install_dir() / "patch" / "cheats").exists():
-            log(f"Using cached pack v{installed_pack_version() or '?'} (no manifest URL).")
-            return pack_install_dir()
+            ver = installed_pack_version() or "?"
+            log(f"Using cached pack v{ver} (no manifest URL).")
+            return PackSyncResult(path=pack_install_dir(), version=ver, changed=False)
         raise RuntimeError(
             "No pack_manifest_url configured.\n"
             "Set it in config.json or bake DEFAULT_PACK_MANIFEST_URL before shipping.\n"
@@ -627,7 +805,7 @@ def ensure_pack(cfg: dict, progress: ProgressFn | None = None, force: bool = Fal
     gct_ok = (pack_install_dir() / "patch" / "cheats" / "pitstop-rmced00.gct").exists()
     if not force and current == version and gct_ok:
         log(f"Pack up to date (v{version}).")
-        return pack_install_dir()
+        return PackSyncResult(path=pack_install_dir(), version=version, changed=False)
 
     log(f"Updating pack: {current or 'none'} → {version}")
     with tempfile.TemporaryDirectory(prefix="pitstop-pack-") as tmp:
@@ -685,31 +863,47 @@ def ensure_pack(cfg: dict, progress: ProgressFn | None = None, force: bool = Fal
             encoding="utf-8",
         )
     log(f"Pack installed → {dest} (v{version})")
-    return dest
+    return PackSyncResult(path=dest, version=version, changed=True)
 
 
 def prepare(cfg: dict) -> tuple[Path, Path]:
     ensure_pack(cfg)
-    main_user = Path(cfg.get("dolphin_user_path") or default_dolphin_user())
     pit_user = ensure_pitstop_user(cfg)
+    ensure_pitstop_save(cfg)
+    assert_save_isolation(cfg)
+    try:
+        import rfldb as rfldb_mod
+
+        rfldb_mod.sync_from_dolphin(cfg)
+    except (OSError, ValueError, RuntimeError) as e:
+        print(f"Mii sync skipped: {e}")
     game = Path(cfg["game_path"])
     image = ensure_patched_image(game)
-    # Patch + descriptor live in the isolated user (own empty NAND / licenses)
+    # Patch + descriptor live only in the isolated Pitstop user — never install into
+    # vanilla Dolphin (that made it easy to play Pitstop patches on the shared NAND).
     patch_root = install_patch(pit_user)
     write_mod_game_ini(pit_user)
-    try:
-        install_patch(main_user)
-    except OSError:
-        pass
+    _remove_stale_main_user_patch(cfg)
     descriptor = write_descriptor(cfg, patch_root, image, pit_user)
     return image, descriptor
 
 
-def setup(cfg: dict) -> None:
+def _remove_stale_main_user_patch(cfg: dict) -> None:
+    """Drop old Pitstop Riivolution copy under vanilla Dolphin, if present."""
+    main = Path(cfg.get("dolphin_user_path") or default_dolphin_user())
+    stale = main / "Load" / "Riivolution" / APP_NAME
+    if stale.is_dir():
+        try:
+            shutil.rmtree(stale)
+        except OSError:
+            pass
+
+
+def setup(cfg: dict, progress: ProgressFn | None = None) -> PackSyncResult:
     game = Path(cfg["game_path"])
     if not game.exists():
         raise FileNotFoundError(f"Game not found: {game}")
-    ensure_pack(cfg)
+    result = ensure_pack(cfg, progress=progress)
     image, descriptor = prepare(cfg)
     pit_user = Path(cfg.get("pitstop_user_path") or default_pitstop_user())
     print("Pitstop online backend: private WWFC (GCT baked into main.dol)")
@@ -718,7 +912,25 @@ def setup(cfg: dict) -> None:
     print(f"Pack: {patch_src()} (tools: {tools_bin()})")
     print(f"Pitstop Dolphin user (isolated saves): {pit_user}")
     print(f"Descriptor: {descriptor}")
+    if result.changed:
+        print(f"Pack updated to v{result.version}.")
+    else:
+        print(f"Pack already up to date (v{result.version}).")
     print("Setup complete. Click Play to launch.")
+    return result
+
+
+def needs_first_run(cfg: dict) -> bool:
+    if bool(cfg.get("setup_complete")):
+        return False
+    # Existing installs already configured — don't force the wizard again
+    dolphin = str(cfg.get("dolphin_path") or "")
+    game = str(cfg.get("game_path") or "")
+    if dolphin_path_ok(dolphin) and game and Path(game).is_file():
+        cfg["setup_complete"] = True
+        save_config(cfg)
+        return False
+    return True
 
 
 def launch(cfg: dict) -> int:
@@ -731,10 +943,30 @@ def launch(cfg: dict) -> int:
 
     pit_user = ensure_pitstop_user(cfg)
     _image, descriptor = prepare(cfg)
-    cmd = [str(dolphin), "-u", str(pit_user), "-e", str(descriptor)]
+    # Re-assert after prepare (install_patch must not have pointed us at vanilla).
+    assert_save_isolation(cfg)
+    van = vanilla_rksys_path(cfg)
+    van_before = None
+    if van is not None and van.is_file():
+        import rksys as rksys_mod
+
+        van_before = rksys_mod.file_fingerprint(van)
+    cmd = [str(dolphin), "-u", str(pit_user.resolve()), "-e", str(descriptor)]
     print(f"Launching Pitstop: {' '.join(cmd)}")
     print("(isolated user folder — vanilla Dolphin saves untouched)")
-    return subprocess.call(cmd)
+    code = subprocess.call(cmd)
+    if van_before is not None and van is not None:
+        import rksys as rksys_mod
+
+        van_after = rksys_mod.file_fingerprint(van)
+        if van_after != van_before:
+            print(
+                "WARNING: vanilla Dolphin rksys.dat changed while Pitstop was running!\n"
+                f"  before: {van_before}\n  after:  {van_after}"
+            )
+        else:
+            print(f"Verified vanilla save unchanged: {van_before}")
+    return code
 
 
 def configure(cfg: dict) -> None:

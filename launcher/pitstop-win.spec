@@ -17,8 +17,8 @@ a = Analysis(
     [str(SPECDIR / "gui.py")],
     pathex=[str(SPECDIR)],
     binaries=[],
-    datas=[],
-    hiddenimports=["pitstop"],
+    datas=[(str(SPECDIR / "assets"), "assets")],
+    hiddenimports=["pitstop", "rksys", "rfldb", "wii_chars"],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -51,4 +51,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=str(SPECDIR / "assets" / "pitstop.ico"),
 )
