@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Config>
+     <!-- Bind on all interfaces so friends can reach the VPS -->
+     <gsAddress>0.0.0.0</gsAddress>
+
+     <nasAddress>0.0.0.0</nasAddress>
+     <nasPort>80</nasPort>
+
+     <nasAddressHttps>0.0.0.0</nasAddressHttps>
+     <nasPortHttps>443</nasPortHttps>
+     <enableHttps>false</enableHttps>
+
+     <!-- Empty = use built-in payload handler (payload/ next to wwfc).
+          Only set this if you run the separate WiiLink payload-server. -->
+     <payloadServerAddress></payloadServerAddress>
+
+     <!-- Internal only — do not expose publicly -->
+     <frontendAddress>127.0.0.1:29998</frontendAddress>
+     <frontendBackendAddress>127.0.0.1:29999</frontendBackendAddress>
+     <backendAddress>127.0.0.1:29999</backendAddress>
+     <backendFrontendAddress>127.0.0.1:29998</backendFrontendAddress>
+
+     <certPath>fullchain.pem</certPath>
+     <keyPath>privkey.pem</keyPath>
+
+     <enableHttpsExploitWii>false</enableHttpsExploitWii>
+     <enableHttpsExploitDS>false</enableHttpsExploitDS>
+
+     <certDerPathWii>naswii-cert.der</certDerPathWii>
+     <keyPathWii>naswii-key.pem</keyPathWii>
+
+     <certDerPathDS>nas-cert.der</certDerPathDS>
+     <wiiCertDerPathDS>nwc.der</wiiCertDerPathDS>
+     <keyPathDS>nas-key.pem</keyPathDS>
+
+     <!-- Critical for Dolphin without a real Wii NAND -->
+     <allowDefaultDolphinKeys>true</allowDefaultDolphinKeys>
+     <allowMultipleDeviceIDs>SameIPAddress</allowMultipleDeviceIDs>
+     <allowConnectWithoutDeviceID>false</allowConnectWithoutDeviceID>
+
+     <serverName>Pitstop</serverName>
+
+     <username>pitstop</username>
+     <password>pitstop</password>
+     <databaseAddress>127.0.0.1</databaseAddress>
+     <databaseName>wwfc</databaseName>
+
+     <logLevel>4</logLevel>
+     <logOutput>StdOutAndFile</logOutput>
+
+     <apiSecret>5b6d8a34649fb186cb10331d5cffe185</apiSecret>
+
+     <eventReporting>
+         <logToDatabase>true</logToDatabase>
+     </eventReporting>
+</Config>

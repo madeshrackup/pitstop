@@ -1,0 +1,27 @@
+<wiidisc version="1">
+	<id game="RMC"/>
+	<options>
+		<section name="Pitstop">
+			<option name="Pitstop">
+				<choice name="Enabled">
+					<patch id="PitstopMain"/>
+				</choice>
+			</option>
+		</section>
+	</options>
+	<patch id="PitstopMain">
+		<!-- Pitstop-only save: never touches vanilla Dolphin MKWii licenses -->
+		<savegame clone="false" external="/riivolution/save/Pitstop/{$__gameid}{$__region}"/>
+		<!-- English UI: replace "Nintendo WFC" with "Pitstop" -->
+		<file disc="/Scene/UI/MenuSingle_U.szs" external="/assets/UI/MenuSingle_U.szs"/>
+		<file disc="/Scene/UI/MenuMulti_U.szs" external="/assets/UI/MenuMulti_U.szs"/>
+		<file disc="/Scene/UI/Globe_U.szs" external="/assets/UI/Globe_U.szs"/>
+		<file disc="/Scene/UI/Title_U.szs" external="/assets/UI/Title_U.szs"/>
+		<file disc="/Scene/UI/Channel_U.szs" external="/assets/UI/Channel_U.szs"/>
+		<!-- Full-screen title art (also baked into cache WBFS) -->
+		<file disc="/thp/title/title.thp" external="/assets/thp/title.thp"/>
+		<file disc="/thp/title/title_SD.thp" external="/assets/thp/title_SD.thp"/>
+		<file disc="/thp/title/title_50.thp" external="/assets/thp/title_50.thp"/>
+		<file disc="/thp/title/title_SD_50.thp" external="/assets/thp/title_SD_50.thp"/>
+	</patch>
+</wiidisc>

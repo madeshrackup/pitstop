@@ -1,0 +1,7 @@
+logs/
+state/
+payload/*
+!payload/README.txt
+.env
+*.pem
+*.der

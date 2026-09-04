@@ -1,0 +1,42 @@
+# Pitstop WWFC — Docker Compose
+# Postgres in a container; wwfc uses host networking so GameSpy ports bind cleanly.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pitstop
+      POSTGRES_PASSWORD: pitstop
+      POSTGRES_DB: wwfc
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pitstop -d wwfc"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  wwfc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./config.xml:/app/config.xml:ro
+      - ./payload:/app/payload:ro
+      - ./logs:/app/logs
+      - ./state:/app/state
+    environment:
+      # host network → db is on localhost:5432
+      TZ: UTC
+
+volumes:
+  pgdata:

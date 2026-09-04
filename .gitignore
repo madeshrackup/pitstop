@@ -1,0 +1,22 @@
+# Build / packaging
+dist/
+build/
+*.spec.bak
+__pycache__/
+*.pyc
+.Python
+
+# Large / regenerable / local-only
+tools/cache/
+patch/assets/thp/
+patch/assets/title-work/
+patch/assets/title-source/
+*.tgz
+*.wbfs
+*.iso
+
+# PyInstaller / OS
+*.app/
+.DS_Store
+.env
+*.log
