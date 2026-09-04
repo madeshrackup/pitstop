@@ -20,3 +20,6 @@ patch/assets/title-source/
 .DS_Store
 .env
 *.log
+
+.venv/
+.venv-build/

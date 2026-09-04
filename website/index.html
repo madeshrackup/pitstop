@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pitstop</title>
+    <meta name="description" content="Private Mario Kart Wii online — download Pitstop." />
+    <link rel="icon" href="assets/favicon.png" type="image/png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="stage">
+      <img
+        class="logo"
+        src="assets/pitstop-logo.png"
+        width="397"
+        height="100"
+        alt="Pitstop"
+        decoding="async"
+      />
+
+      <div class="cta" id="cta">
+        <a class="download" id="primary-download" href="#">Download</a>
+
+        <div class="other" id="other">
+          <button type="button" class="other-toggle" id="other-toggle" aria-expanded="false" aria-controls="other-menu">
+            Other platforms
+            <span class="chevron" aria-hidden="true"></span>
+          </button>
+          <div class="other-menu" id="other-menu" hidden></div>
+        </div>
+      </div>
+    </main>
+
+    <script src="main.js"></script>
+  </body>
+</html>
