@@ -16,7 +16,7 @@
       label: "Windows",
       button: "Download for Windows",
       url: `${RELEASE}/Pitstop.exe`,
-      available: false,
+      available: true,
       soonLabel: "Windows coming soon",
     },
   };
