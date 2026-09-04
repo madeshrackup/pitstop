@@ -4,38 +4,62 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Pitstop</title>
-    <meta name="description" content="Private Mario Kart Wii online — download Pitstop." />
+    <meta
+      name="description"
+      content="Mario Kart Wii the way it was intended — download Pitstop."
+    />
     <link rel="icon" href="assets/favicon.png" type="image/png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="stage">
-      <img
-        class="logo"
-        src="assets/pitstop-logo.png"
-        width="397"
-        height="100"
-        alt="Pitstop"
-        decoding="async"
-      />
+    <main class="page">
+      <section class="hero">
+        <img
+          class="logo"
+          src="assets/pitstop-logo.png"
+          width="397"
+          height="100"
+          alt="Pitstop"
+          decoding="async"
+        />
+        <p class="tagline">Mario Kart Wii the way it was intended</p>
 
-      <div class="cta" id="cta">
-        <a class="download" id="primary-download" href="#">Download</a>
+        <div class="cta" id="cta">
+          <a class="download" id="primary-download" href="#">Download</a>
 
-        <div class="other" id="other">
-          <button type="button" class="other-toggle" id="other-toggle" aria-expanded="false" aria-controls="other-menu">
-            Other platforms
-            <span class="chevron" aria-hidden="true"></span>
-          </button>
-          <div class="other-menu" id="other-menu" hidden></div>
+          <div class="other" id="other">
+            <button
+              type="button"
+              class="other-toggle"
+              id="other-toggle"
+              aria-expanded="false"
+              aria-controls="other-menu"
+            >
+              Other platforms
+              <span class="chevron" aria-hidden="true"></span>
+            </button>
+            <div class="other-menu" id="other-menu" hidden></div>
+          </div>
         </div>
-      </div>
+      </section>
+
+      <section class="about" id="about" aria-labelledby="about-heading">
+        <h2 id="about-heading">About</h2>
+        <p>
+          Pitstop is a private Mario Kart Wii online launcher for friends —
+          isolated saves, a private server, and a simple setup so you can race
+          without the usual hassle.
+        </p>
+        <p class="credit">
+          Created by <span class="name">Madesh</span>
+        </p>
+      </section>
     </main>
 
     <script src="main.js"></script>
