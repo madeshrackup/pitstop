@@ -412,23 +412,20 @@ def patched_image_path() -> Path:
 
 
 def dump_stamp(game_path: Path) -> str:
+    """Stable cache key for the patched WBFS.
+
+    Avoids filesystem mtimes (antivirus / pack re-copy can change them and force a
+    full re-extract between setup and Play).
+    """
     st = game_path.stat()
     gct = resolve_gct()
-    gct_mtime = gct.stat().st_mtime_ns if gct.exists() else 0
-    ui_mtime = 0
-    ui_dir = patch_src() / "assets" / "UI"
-    if ui_dir.is_dir():
-        for p in sorted(ui_dir.glob("*.szs")):
-            ui_mtime ^= p.stat().st_mtime_ns
-            ui_mtime ^= p.stat().st_size
-    thp_dir = patch_src() / "assets" / "thp"
-    if thp_dir.is_dir():
-        for p in sorted(thp_dir.glob("*.thp")):
-            ui_mtime ^= p.stat().st_mtime_ns
-            ui_mtime ^= p.stat().st_size
+    gct_hash = _sha256_file(gct) if gct.is_file() else "missing"
+    pack_ver = installed_pack_version() or "none"
+    # Normalize so D:/foo and D:\foo match on Windows
+    game_key = str(game_path.resolve()).replace("\\", "/").casefold()
     return (
-        f"{PATCHER_VERSION}\n{gct.name}\n{game_path.resolve()}\n"
-        f"{st.st_mtime_ns}\n{st.st_size}\n{gct_mtime}\n{ui_mtime}\n"
+        f"{PATCHER_VERSION}\n{pack_ver}\n{gct.name}\n{gct_hash}\n"
+        f"{game_key}\n{st.st_size}\n"
     )
 
 
@@ -542,9 +539,14 @@ def ensure_patched_image(game_path: Path) -> Path:
     dest = patched_image_path()
     stamp = dest.with_suffix(".stamp")
     key = dump_stamp(game_path)
-    if dest.exists() and dest.stat().st_size > 100_000_000 and stamp.exists():
-        if stamp.read_text(encoding="utf-8") == key:
+    if dest.exists() and dest.stat().st_size > 100_000_000:
+        if stamp.is_file() and stamp.read_text(encoding="utf-8") == key:
+            print(f"Using cached patched image: {dest}")
             return dest
+        if stamp.is_file():
+            print("Patched image cache outdated — rebuilding…")
+        else:
+            print("Patched image missing stamp — rebuilding…")
 
     wit = find_tool("wit")
     wstrt = find_tool("wstrt")
@@ -586,7 +588,8 @@ def ensure_patched_image(game_path: Path) -> Path:
             [str(wit), "copy", "--overwrite", str(fst), str(tmp_wbfs)]
         )
     tmp_wbfs.replace(dest)
-    stamp.write_text(key, encoding="utf-8")
+    # Write stamp after build so it matches the pack/GCT actually used
+    stamp.write_text(dump_stamp(game_path), encoding="utf-8")
     print(f"Patched image: {dest}")
     return dest
 
